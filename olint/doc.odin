@@ -169,7 +169,7 @@ Limits
 package olint
 
 // Version of the olint library and CLI.
-VERSION :: "0.0.0" // x-release-please-version
+VERSION :: "0.1.0" // x-release-please-version
 
 // Enforce zero heap allocations globally across all procedures.
 DEFAULT_ZERO_ALLOC: bool : #config(OLINT_ZERO_ALLOC, false)
