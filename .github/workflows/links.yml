@@ -10,6 +10,7 @@ on:
     paths:
       - "**.md"
       - "scripts/odin-doc.json"
+      - "lychee.toml"
 
 permissions:
   contents: read
