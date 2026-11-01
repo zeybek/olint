@@ -1,0 +1,4 @@
+# LF everywhere, so the shell scripts also run from Git Bash on Windows.
+* text=auto eol=lf
+
+*.odin linguist-language=Odin

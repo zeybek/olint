@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Every night, also against Odin's nightly build, to catch breaking changes in core early.
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The same checks Odin's own CI applies to core. Split into an array where used.
+  FLAGS: -vet -vet-tabs -vet-style -vet-cast -strict-style -warnings-as-errors -disallow-do
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Odin ${{ matrix.odin }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel, windows-latest]
+        odin: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["latest", "nightly"]' || '["latest"]') }}
+        exclude:
+          # Odin publishes no nightly build for Intel macOS.
+          - os: macos-15-intel
+            odin: nightly
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: ${{ matrix.odin }}
+
+      - name: Odin version
+        run: odin report
+
+      - name: Test flags
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            echo "TEST_FLAGS=-sanitize:address -define:ODIN_TEST_FANCY=false" >> "$GITHUB_ENV"
+          else
+            echo "TEST_FLAGS=-define:ODIN_TEST_FANCY=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Check
+        run: |
+          read -ra flags <<< "$FLAGS"
+          odin check olint -no-entry-point "${flags[@]}"
+          odin check cmd/olint "${flags[@]}"
+          odin check tests -no-entry-point "${flags[@]}"
+          for ex in audio_dsp game_loop/physics game_loop/sim game_loop/tests layered_arch/domain layered_arch/service; do
+            odin check "examples/$ex" -no-entry-point "${flags[@]}"
+          done
+
+      - name: Library tests
+        run: |
+          read -ra flags <<< "$FLAGS $TEST_FLAGS"
+          odin test tests -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true "${flags[@]}"
+
+      - name: CLI tests
+        run: |
+          read -ra flags <<< "$FLAGS $TEST_FLAGS"
+          odin test cmd/olint -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true "${flags[@]}"
+
+      - name: Example architecture & @zero_alloc tests inside odin test
+        run: |
+          read -ra flags <<< "$FLAGS $TEST_FLAGS"
+          cd examples/game_loop/tests && odin test . -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true "${flags[@]}"
+
+      - name: Build the CLI
+        run: |
+          read -ra flags <<< "$FLAGS"
+          mkdir -p bin
+          exe=bin/olint
+          if [ "$RUNNER_OS" = "Windows" ]; then exe=bin/olint.exe; fi
+          odin build cmd/olint -out:"$exe" -o:speed "${flags[@]}"
+          echo "CLI_BIN=./$exe" >> "$GITHUB_ENV"
+
+      - name: End-to-end smoke test
+        run: ./scripts/smoke.sh "$CLI_BIN"
+
+      - name: Source tree is untouched
+        run: |
+          git status --porcelain -- . ':!bin'
+          test -z "$(git status --porcelain -- . ':!bin')"
+
+  format:
+    name: odinfmt
+    runs-on: ubuntu-latest
+    env:
+      # DanielGavin/ols commit the sources were formatted with.
+      OLS_COMMIT: 8185e12e791ab082ad05998fa795ee992c2f6541
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: latest
+
+      - name: Build odinfmt
+        run: |
+          git clone https://github.com/DanielGavin/ols.git "$RUNNER_TEMP/ols"
+          git -C "$RUNNER_TEMP/ols" checkout "$OLS_COMMIT"
+          odin build "$RUNNER_TEMP/ols/tools/odinfmt/main.odin" -file -collection:src="$RUNNER_TEMP/ols/src" -out:"$RUNNER_TEMP/odinfmt" -o:speed
+
+      - name: Check formatting
+        run: make fmt-check ODINFMT="$RUNNER_TEMP/odinfmt"

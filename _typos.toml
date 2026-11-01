@@ -1,0 +1,8 @@
+# Spelling check settings for typos (https://github.com/crate-ci/typos).
+
+[default.extend-words]
+sarif = "sarif"
+
+[default.extend-identifiers]
+# The misspelled annotation `annotation/unknown` exists to catch, used in its docs and tests.
+zero_aloc = "zero_aloc"

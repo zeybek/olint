@@ -1,0 +1,9 @@
+bin/
+build/
+.olint_test_*
+*.o
+*.obj
+*.exe
+*.bin
+*.sarif
+*.DS_Store

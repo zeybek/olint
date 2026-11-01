@@ -1,0 +1,59 @@
+name: Docs
+
+# Builds the package documentation with the generator behind pkg.odin-lang.org and
+# publishes it to GitHub Pages (in the repository settings under Pages, with GitHub Actions
+# as the source).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      # odin-lang/pkg.odin-lang.org commit the generator is built from.
+      ODIN_DOC_COMMIT: 3eb3d0cbd6b4a01b898307137fdb4854b708fe50
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: latest
+
+      - name: Install commonmark
+        run: sudo apt-get update && sudo apt-get install -y libcmark-dev
+
+      - name: Build the docs generator
+        run: |
+          git clone https://github.com/odin-lang/pkg.odin-lang.org.git "$RUNNER_TEMP/odin-doc-src"
+          git -C "$RUNNER_TEMP/odin-doc-src" checkout "$ODIN_DOC_COMMIT"
+          mkdir -p "$RUNNER_TEMP/bin"
+          odin build "$RUNNER_TEMP/odin-doc-src" -out:"$RUNNER_TEMP/bin/odin-doc" -o:speed
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Generate
+        run: ./scripts/build_docs.sh
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./build/docs
+
+      - uses: actions/deploy-pages@v5
+        id: deployment

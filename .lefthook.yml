@@ -1,0 +1,22 @@
+# Git hooks for working on olint. Install lefthook (https://lefthook.dev), then run
+# `make hooks` once. CI runs everything again, so these only catch the usual mistakes
+# before they reach a commit. Checks whose tool isn't installed are skipped.
+
+commit-msg:
+  jobs:
+    - name: conventional commit
+      run: ./scripts/check_commit_msg.sh {1}
+
+pre-commit:
+  jobs:
+    - name: odinfmt
+      glob: "*.odin"
+      run: ./scripts/check_fmt.sh {staged_files}
+    - name: odin check
+      glob: "*.odin"
+      run: make check
+    - name: shellcheck
+      glob: "*.sh"
+      run: command -v shellcheck >/dev/null || exit 0; shellcheck {staged_files}
+    - name: typos
+      run: command -v typos >/dev/null || exit 0; typos {staged_files}

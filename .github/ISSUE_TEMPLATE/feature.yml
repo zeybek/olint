@@ -1,0 +1,16 @@
+name: Feature request
+description: A rule, report format, or workflow olint should support.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you're trying to verify
+      description: The bug, invariant, or architectural boundary you'd like olint to catch.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: How it could look
+      description: An annotation, CLI flag, or example diagnostic output, if you have one.
