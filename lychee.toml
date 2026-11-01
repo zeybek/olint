@@ -1,0 +1,5 @@
+# Settings for lychee (https://lychee.cli.rs), read by `make links` and the Links workflow.
+
+# release-please writes a compare link to the new tag into CHANGELOG.md, and the tag only
+# exists once its release PR is merged.
+exclude = ['^https://github\.com/zeybek/olint/compare/v']
