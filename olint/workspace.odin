@@ -1414,9 +1414,11 @@ workspace_load_virtual :: proc(
 	p.err = _parser_error_handler
 	p.warn = _parser_warn_handler
 
+	// Imports resolve through `filepath.join`, which cleans its result (with `\` on Windows),
+	// so package directories are cleaned the same way.
 	dirs := make([dynamic]string, context.temp_allocator)
 	for vf in vfiles {
-		dir := filepath.dir(vf.path)
+		dir, _ := filepath.clean(filepath.dir(vf.path), context.temp_allocator)
 		if !slice.contains(dirs[:], dir) {
 			append(&dirs, dir)
 		}
@@ -1432,7 +1434,8 @@ workspace_load_virtual :: proc(
 
 		pkg_info := _new_package(&ws, dir, false)
 		for vf in vfiles {
-			if filepath.dir(vf.path) != dir {
+			if vf_dir, _ := filepath.clean(filepath.dir(vf.path), context.temp_allocator);
+			   vf_dir != dir {
 				continue
 			}
 			src := strings.clone(vf.src, arena_alloc)

@@ -316,6 +316,41 @@ iter_batched :: proc(b: ^Bencher, setup: rawptr = nil, routine: rawptr = nil, te
 	testing.expect(t, chain_has_aprintf)
 }
 
+// Virtual package directories are compared in the cleaned form imports resolve to (on Windows
+// that form uses `\`, so `/virtual/lib` never matched).
+@(test)
+test_virtual_imports_resolve_to_cleaned_directories :: proc(t: ^testing.T) {
+	rep := _analyze(
+		{
+			{
+				path = "/virtual/app/app.odin",
+				src = `package app
+
+import "../lib"
+
+// @zero_alloc
+run :: proc() -> int {
+	return lib.grow()
+}
+`,
+			},
+			{
+				path = "/virtual/x/../lib/lib.odin",
+				src = `package lib
+
+grow :: proc() -> int {
+	xs := make([]int, 4)
+	defer delete(xs)
+	return len(xs)
+}
+`,
+			},
+		},
+	)
+	defer olint.report_destroy(&rep)
+	testing.expect(t, _has(_symbols_for(&rep, .Zero_Alloc), "app.run"))
+}
+
 // `iter_with_large_drop` measures `routine` only; `drop` runs outside the measurement.
 @(test)
 test_iter_with_large_drop_measures_only_the_routine :: proc(t: ^testing.T) {
